@@ -1,5 +1,6 @@
 {
   "project": "ctr-models",
+  "entity": "BOAZminiprj2",
   "run_name": "autoint_baseline",
   "model_type": "autoint",
 

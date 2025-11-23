@@ -163,6 +163,7 @@ def main():
 
     wandb.init(
         project=config["project"],
+        entity=config["entity"],
         name=config["run_name"],
         config=config,
     )
