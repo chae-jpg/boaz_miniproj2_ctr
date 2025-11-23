@@ -7,9 +7,10 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import wandb
+import numpy as np
+from sklearn.metrics import roc_auc_score
 
 from util.utils import get_device, set_seed, build_model
-# from data.dataset import CriteoDataset  # 실제 데이터셋 있으면 주석 해제
 
 
 def train_one_epoch(
@@ -102,6 +103,9 @@ def evaluate(
     running_correct = 0
     running_total = 0
 
+    all_probs = []
+    all_labels = []
+
     for xi, xv, y in loader:
         xi = xi.to(device=device, dtype=torch.long)
         xv = xv.to(device=device, dtype=torch.float)
@@ -120,13 +124,23 @@ def evaluate(
         running_correct += correct
         running_total += total
 
+        all_probs.append(probs.detach().cpu().numpy())
+        all_labels.append(y.view(-1).detach().cpu().numpy())
+
+    ## AUC 계산
+    all_probs = np.concatenate(all_probs)
+    all_labels = np.concatenate(all_labels)
+
     epoch_loss = running_loss / max(running_total, 1)
     epoch_acc = running_correct / max(running_total, 1)
+
+    epoch_auc = roc_auc_score(all_labels, all_probs)
 
     wandb.log(
         {
             f"{split}/loss": epoch_loss,
             f"{split}/acc": epoch_acc,
+            f"{split}/auc": epoch_auc,
             f"{split}/epoch": epoch,
             "global_step": global_step,
         }
