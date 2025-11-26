@@ -161,7 +161,7 @@ def main():
     os.makedirs(config["save_dir"], exist_ok=True)
 
     set_seed(config["seed"])
-    device = get_device()
+    device = 'mps'
     print("Device:", device)
 
     wandb.init(
@@ -214,6 +214,11 @@ def main():
 
     best_val_loss = float("inf")
     global_step = 0
+    
+    # Early stopping setup
+    patience = config.get("early_stopping_patience", 10)
+    patience_counter = 0
+    print(f"Early stopping enabled with patience={patience}")
 
     for epoch in range(1, config["epochs"] + 1):
         print(f"\n===== Epoch [{epoch}/{config['epochs']}] =====")
@@ -241,8 +246,11 @@ def main():
 
         scheduler.step()
 
+        print(f'DEBUG: val_loss={val_metrics["loss"]:.6f}, best_val_loss={best_val_loss:.6f}')
+
         if val_metrics["loss"] < best_val_loss:
             best_val_loss = val_metrics["loss"]
+            patience_counter = 0  # Reset counter when improvement occurs
             ckpt_path = os.path.join(
                 config["save_dir"], f"best_{config['model_type']}.pth"
             )
@@ -259,6 +267,15 @@ def main():
                 ckpt_path,
             )
             print(f"★ New best model saved to {ckpt_path} (val_loss={best_val_loss:.4f})")
+        else:
+            patience_counter += 1
+            print(f"No improvement for {patience_counter}/{patience} epochs")
+            
+            if patience_counter >= patience:
+                print(f"\n⚠️ Early stopping triggered! No improvement for {patience} epochs.")
+                print(f"Best validation loss: {best_val_loss:.4f}")
+                break
+
 
     print("Training finished.")
     wandb.finish()
