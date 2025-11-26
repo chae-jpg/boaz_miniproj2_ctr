@@ -1,0 +1,19 @@
+[INFO] Loading preprocessed parquet from: ./data/final_preprocessed_df.parquet
+[INFO] TOTAL: 3,667,756
+[INFO] Train: 2,934,204 (80.0%)
+[INFO] Valid: 366,775 (10.0%)
+[INFO] Test : 366,776 (10.0%)
+[V1 Created] N=2934204, Sparse Fields=11
+[V1 Created] N=366775, Sparse Fields=11
+[V1 Created] N=366776, Sparse Fields=11
+Feature sizes: [1, 1, 1, 1, 1, 113587, 651, 126, 3534, 1152627, 2300180]
+Traceback (most recent call last):
+  File "/Users/cakenpeace/2025_EWHA/BOAZ/mp2/mp2/train.py", line 266, in <module>
+    main()
+    ~~~~^^
+  File "/Users/cakenpeace/2025_EWHA/BOAZ/mp2/mp2/train.py", line 196, in main
+    model = build_model(config, feature_sizes, device)
+  File "/Users/cakenpeace/2025_EWHA/BOAZ/mp2/mp2/util/utils.py", line 39, in build_model
+    dnn_hidden_units=config["dnn_hidden_units"],
+                     ~~~~~~^^^^^^^^^^^^^^^^^^^^
+KeyError: 'dnn_hidden_units'

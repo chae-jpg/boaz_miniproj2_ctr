@@ -11,7 +11,8 @@ import numpy as np
 from sklearn.metrics import roc_auc_score
 
 from util.utils import get_device, set_seed, build_model
-
+from data.split import split_exact_tvt_from_preprocessed, extract_dims
+from data.dataset import create_v1_dataloaders, create_v2_dataloaders, create_v3_dataloaders
 
 def train_one_epoch(
     model: nn.Module,
@@ -158,7 +159,7 @@ def main():
     os.makedirs(config["save_dir"], exist_ok=True)
 
     set_seed(config["seed"])
-    device = get_device(config["use_cuda"])
+    device = get_device()
     print("Device:", device)
 
     wandb.init(
@@ -168,35 +169,28 @@ def main():
         config=config,
     )
 
-    # TODO: 실제 데이터셋으로 교체
-    # train_data = CriteoDataset(config["data_dir"], train=True)
-    # val_data = CriteoDataset(config["data_dir"], train=False)
-    train_data = ...
-    val_data = ...
-
-    train_loader = DataLoader(
-        train_data,
-        batch_size=config["batch_size"],
-        shuffle=True,
-        num_workers=config["num_workers"],
-        pin_memory=True,
+    # Suppose using preprocessed data
+    train_df, val_df, test_df = split_exact_tvt_from_preprocessed(
+        parquet_path=config["data_dir"] + '/' + config["data_name"],
     )
 
-    val_loader = DataLoader(
-        val_data,
-        batch_size=config["batch_size"],
-        shuffle=False,
-        num_workers=config["num_workers"],
-        pin_memory=True,
-    )
+    base_sparse_dims, v2_sparse_dims = extract_dims(train_df)
 
-    # feature_sizes 추출
-    if hasattr(train_data, "feature_sizes"):
-        feature_sizes = train_data.feature_sizes
-    elif hasattr(train_data, "field_sizes"):
-        feature_sizes = train_data.field_sizes
+    if config["data_loader"] == "v1":
+        train_loader, val_loader, test_loader = create_v1_dataloaders(train_df, val_df, test_df, base_sparse_dims)
+    elif config["data_loader"] == "v2":
+        train_loader, val_loader, test_loader = create_v2_dataloaders(train_df, val_df, test_df, v2_sparse_dims)
+    elif config["data_loader"] == "v3":
+        train_loader, val_loader, test_loader = create_v3_dataloaders(train_df, val_df, test_df, base_sparse_dims)
     else:
-        raise ValueError("Dataset must have 'feature_sizes' or 'field_sizes' attribute.")
+        raise ValueError(f"Unknown data loader: {config['data_loader']}")
+
+    # feature_sizes 추출 (DataLoader의 dataset에서 가져오기)
+    if hasattr(train_loader.dataset, "field_dims"):
+        feature_sizes = train_loader.dataset.field_dims
+        print(f"Feature sizes: {feature_sizes}")
+    else:
+        raise ValueError("Dataset must have 'field_dims' attribute.")
 
     # DeepFM / AutoInt 선택은 build_model 안에서 config["model_type"] 보고 처리한다고 가정
     model = build_model(config, feature_sizes, device)

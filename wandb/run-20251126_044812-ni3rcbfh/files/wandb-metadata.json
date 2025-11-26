@@ -1,0 +1,17 @@
+{
+  "os": "macOS-26.2-arm64-arm-64bit-Mach-O",
+  "python": "CPython 3.14.0",
+  "startedAt": "2025-11-25T19:48:12.883378Z",
+  "program": "/Users/cakenpeace/2025_EWHA/BOAZ/mp2/mp2/train.py",
+  "codePath": "train.py",
+  "codePathLocal": "train.py",
+  "git": {
+    "remote": "https://github.com/chae-jpg/boaz_miniproj2_ctr.git",
+    "commit": "ca6f3a5302c00acb424adbd2aaba2ec03b23533a"
+  },
+  "email": "chwon02@naver.com",
+  "root": "/Users/cakenpeace/2025_EWHA/BOAZ/mp2/mp2",
+  "host": "Chaeui-MacBookAir.local",
+  "executable": "/usr/local/bin/python3",
+  "writerId": "9kbf1v03npcdmd58j8etxynmhazcw92h"
+}

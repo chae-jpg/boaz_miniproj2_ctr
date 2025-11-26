@@ -3,28 +3,35 @@
   "entity": "BOAZminiprj2",
   "run_name": "autoint_baseline",
   "model_type": "autoint",
-
   "data_dir": "./data",
+  "data_name": "final_preprocessed_df.parquet",
+  "data_loader": "v1",
   "batch_size": 100,
   "num_workers": 4,
   "seed": 42,
   "epochs": 100,
   "lr": 0.001,
   "weight_decay": 1e-5,
-  "use_cuda": true,
+  "use_cuda": "cuda",
   "save_dir": "./ckpts",
-
   "embedding_size": 16,
-
-  "deepfm_hidden_dims": [32, 32],
-  "deepfm_dropout": [0.5, 0.5],
-
+  "deepfm_hidden_dims": [
+    32,
+    32
+  ],
+  "deepfm_dropout": [
+    0.5,
+    0.5
+  ],
   "embedding_dropout": 0.0,
   "att_layer_num": 3,
   "att_head_num": 2,
   "att_res": true,
   "att_dropout": 0.0,
-  "autoint_dnn_hidden_units": [32, 32],
+  "autoint_dnn_hidden_units": [
+    32,
+    32
+  ],
   "dnn_use_bn": false,
   "dnn_dropout": 0.0,
   "l2_reg_dnn": 0.0,

@@ -1,0 +1,37 @@
+{
+  "os": "macOS-26.2-arm64-arm-64bit-Mach-O",
+  "python": "CPython 3.14.0",
+  "startedAt": "2025-11-26T05:00:57.501646Z",
+  "program": "/Users/cakenpeace/2025_EWHA/BOAZ/mp2/mp2/train.py",
+  "codePath": "train.py",
+  "codePathLocal": "train.py",
+  "git": {
+    "remote": "https://github.com/chae-jpg/boaz_miniproj2_ctr.git",
+    "commit": "ca6f3a5302c00acb424adbd2aaba2ec03b23533a"
+  },
+  "email": "chwon02@naver.com",
+  "root": "/Users/cakenpeace/2025_EWHA/BOAZ/mp2/mp2",
+  "host": "Chaeui-MacBookAir.local",
+  "executable": "/usr/local/bin/python3",
+  "cpu_count": 8,
+  "cpu_count_logical": 8,
+  "disk": {
+    "/": {
+      "total": "245107195904",
+      "used": "213180489728"
+    }
+  },
+  "memory": {
+    "total": "17179869184"
+  },
+  "apple": {
+    "name": "Apple M3",
+    "ecpuCores": 4,
+    "pcpuCores": 4,
+    "gpuCores": 10,
+    "memoryGb": 16,
+    "swapTotalBytes": "3221225472",
+    "ramTotalBytes": "17179869184"
+  },
+  "writerId": "554c861atq5u86ivn3li3jopws3khyrv"
+}

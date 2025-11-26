@@ -1,0 +1,18 @@
+[INFO] Loading preprocessed parquet from: ./data/final_preprocessed_df.parquet
+[INFO] TOTAL: 3,667,756
+[INFO] Train: 2,934,204 (80.0%)
+[INFO] Valid: 366,775 (10.0%)
+[INFO] Test : 366,776 (10.0%)
+Traceback (most recent call last):
+  File "/Users/cakenpeace/2025_EWHA/BOAZ/mp2/mp2/train.py", line 291, in <module>
+    main()
+    ~~~~^^
+  File "/Users/cakenpeace/2025_EWHA/BOAZ/mp2/mp2/train.py", line 180, in main
+    train_data, val_data, test_data = create_v1_dataloaders(train_df, val_df, test_df, sparse_dims)
+                                      ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/cakenpeace/2025_EWHA/BOAZ/mp2/mp2/data/dataset.py", line 56, in create_v1_dataloaders
+    train_ds = DatasetV1(train_df, sparse_dims)
+  File "/Users/cakenpeace/2025_EWHA/BOAZ/mp2/mp2/data/dataset.py", line 25, in __init__
+    self.dense = df[DENSE_COLS].astype("float32").values # Continuous values
+                    ^^^^^^^^^^
+NameError: name 'DENSE_COLS' is not defined
