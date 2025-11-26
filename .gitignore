@@ -1,2 +1,9 @@
 AutoInt_pytorch/
 DeepFM_with_Pytorch/
+
+# Data files
+*.parquet
+*.csv
+*.pkl
+data/*.parquet
+data/*.csv
