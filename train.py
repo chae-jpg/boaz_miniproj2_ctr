@@ -35,8 +35,12 @@ def train_one_epoch(
         xi = batch["xi"].to(device=device, dtype=torch.long)
         xv = batch["xv"].to(device=device, dtype=torch.float)
         y = batch["label"].to(device=device, dtype=torch.float)  # (N,) 또는 (N,1)
+        
+        seq = None
+        if "seq" in batch:
+             seq = batch["seq"].to(device=device, dtype=torch.long)
 
-        logits = model(xi, xv)          # DeepFM: (N,), AutoInt: (N,1)
+        logits = model(xi, xv, seq=seq)          # DeepFM: (N,), AutoInt: (N,1)
         logits = logits.view(-1)        # (N,)
         preds = torch.sigmoid(logits)   # Apply sigmoid to get [0,1] range
         loss = criterion(preds, y.view(-1))
@@ -112,7 +116,11 @@ def evaluate(
         xv = batch["xv"].to(device=device, dtype=torch.float)
         y = batch["label"].to(device=device, dtype=torch.float)
 
-        logits = model(xi, xv)
+        seq = None
+        if "seq" in batch:
+             seq = batch["seq"].to(device=device, dtype=torch.long)
+
+        logits = model(xi, xv, seq=seq)
         logits = logits.view(-1)
         preds = torch.sigmoid(logits)   # Apply sigmoid to get [0,1] range
         loss = criterion(preds, y.view(-1))
@@ -188,14 +196,18 @@ def main():
         raise ValueError(f"Unknown data loader: {config['data_loader']}")
 
     # feature_sizes 추출 (DataLoader의 dataset에서 가져오기)
+    seq_vocab_size = None
     if hasattr(train_loader.dataset, "field_dims"):
         feature_sizes = train_loader.dataset.field_dims
         print(f"Feature sizes: {feature_sizes}")
+        if hasattr(train_loader.dataset, "seq_vocab_size"):
+             seq_vocab_size = train_loader.dataset.seq_vocab_size
+             print(f"Sequence Vocab Size: {seq_vocab_size}")
     else:
         raise ValueError("Dataset must have 'field_dims' attribute.")
 
     # DeepFM / AutoInt 선택은 build_model 안에서 config["model_type"] 보고 처리한다고 가정
-    model = build_model(config, feature_sizes, device)
+    model = build_model(config, feature_sizes, device, seq_vocab_size=seq_vocab_size)
 
     criterion = nn.MSELoss()  # Using MSE for regression (labels: 0, 0.5, 1)
     optimizer = torch.optim.Adam(

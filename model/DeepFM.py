@@ -28,7 +28,7 @@ class DeepFM(nn.Module):
 
     def __init__(self, feature_sizes, embedding_size=4,
                  hidden_dims=[32, 32], num_classes=1, dropout=[0.5, 0.5], 
-                 use_cuda=True, verbose=False):
+                 use_cuda=True, verbose=False, seq_vocab_size=None):
         """
         Initialize a new network
 
@@ -64,6 +64,15 @@ class DeepFM(nn.Module):
             [nn.Embedding(feature_size, 1) for feature_size in self.feature_sizes])
         self.fm_second_order_embeddings = nn.ModuleList(
             [nn.Embedding(feature_size, self.embedding_size) for feature_size in self.feature_sizes])
+        
+        """
+            init GRU part (if seq_vocab_size provided)
+        """
+        self.seq_vocab_size = seq_vocab_size
+        if self.seq_vocab_size is not None:
+            self.gru_embedding = nn.Embedding(self.seq_vocab_size, self.embedding_size)
+            self.gru = nn.GRU(input_size=self.embedding_size, hidden_size=self.embedding_size, batch_first=True)
+            self.gru_linear = nn.Linear(self.embedding_size, 1)
         """
             init deep part
         """
@@ -78,7 +87,9 @@ class DeepFM(nn.Module):
             setattr(self, 'dropout_'+str(i),
                     nn.Dropout(dropout[i-1]))
 
-    def forward(self, Xi, Xv):
+        
+
+    def forward(self, Xi, Xv, seq=None):
         """
         Forward process of network. 
 
@@ -118,6 +129,18 @@ class DeepFM(nn.Module):
         """
         total_sum = torch.sum(fm_first_order, 1) + \
                     torch.sum(fm_second_order, 1) + torch.sum(deep_out, 1) + self.bias
+        
+        """
+            GRU part
+        """
+        if self.seq_vocab_size is not None and seq is not None:
+            # seq: (N, SeqLen)
+            gru_emb = self.gru_embedding(seq) # (N, SeqLen, EmbSize)
+            _, h_n = self.gru(gru_emb) # h_n: (1, N, EmbSize)
+            gru_out = h_n.squeeze(0)   # (N, EmbSize)
+            gru_logit = self.gru_linear(gru_out) # (N, 1)
+            total_sum = total_sum + gru_logit.squeeze(-1)
+
         return total_sum
 
     def fit(self, loader_train, loader_val, optimizer, epochs=100, verbose=False, print_every=100):
