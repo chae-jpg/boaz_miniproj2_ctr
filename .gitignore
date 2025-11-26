@@ -1,2 +1,19 @@
 AutoInt_pytorch/
 DeepFM_with_Pytorch/
+
+# Data files
+*.parquet
+*.csv
+*.pkl
+data/*.parquet
+data/*.csv
+
+# Checkpoint files
+ckpts/
+
+# WandB files
+wandb/
+*.log
+
+# pycache
+__pycache__/

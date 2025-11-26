@@ -36,7 +36,7 @@ def build_model(config, feature_sizes, device):
             att_head_num=config["att_head_num"],
             att_res=config["att_res"],
             att_dropout=config["att_dropout"],
-            dnn_hidden_units=config["dnn_hidden_units"],
+            dnn_hidden_units=config["autoint_dnn_hidden_units"],
             dnn_activation='relu',
             l2_reg_dnn=config["l2_reg_dnn"],
             l2_reg_embedding=config["l2_reg_embedding"],
