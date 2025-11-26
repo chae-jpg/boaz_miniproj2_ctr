@@ -1,8 +1,8 @@
 {
   "project": "ctr-models",
   "entity": "BOAZminiprj2",
-  "run_name": "autoint_baseline",
-  "model_type": "autoint",
+  "run_name": "deepfm_baseline",
+  "model_type": "deepfm",
   "data_dir": "./data",
   "data_name": "final_preprocessed_df.parquet",
   "data_loader": "v1",
