@@ -88,17 +88,29 @@ def split_exact_tvt_from_preprocessed(
 
     return df_train, df_valid, df_test
 
-def extract_dims(train_df: pd.DataFrame):
-    # (1) Base Sparse Dims: 기본 6개 범주형 컬럼의 최대 인덱스+1
-    base_sparse_dims = [int(train_df[col].max() + 1) for col in SPARSE_BASE_COLS]
+def extract_dims(train_df, val_df, test_df):
+    # Base Sparse dims
+    base_sparse_dims = []
+    for col in SPARSE_BASE_COLS:
+        global_max = max(
+            train_df[col].max(),
+            val_df[col].max(),
+            test_df[col].max()
+        )
+        base_sparse_dims.append(int(global_max + 1))
 
-    # (2) Product Vocab: 시퀀스 컬럼과 상품ID 컬럼 통틀어 가장 큰 값+1
-    max_prod_idx = train_df[SEQ_COLS].max().max()
-    if "product_id_idx" in train_df.columns:
-        max_prod_idx = max(max_prod_idx, train_df["product_id_idx"].max())
-    product_vocab_size = int(max_prod_idx + 1)
+    # Product vocab (product_id_idx + seq)
+    prod_global_max = max(
+        train_df[SEQ_COLS].max().max(),
+        val_df[SEQ_COLS].max().max(),
+        test_df[SEQ_COLS].max().max(),
+        train_df["product_id_idx"].max(),
+        val_df["product_id_idx"].max(),
+        test_df["product_id_idx"].max(),
+    )
+    product_vocab_size = int(prod_global_max + 1)
 
-    # (3) V2용 차원: Base(6개) + Seq(5개)
-    v2_sparse_dims = base_sparse_dims + [product_vocab_size] * 5
+    # For V2 (Base + 5 seq fields)
+    v2_sparse_dims = base_sparse_dims + [product_vocab_size] * len(SEQ_COLS)
 
     return base_sparse_dims, v2_sparse_dims
