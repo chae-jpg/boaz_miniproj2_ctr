@@ -43,7 +43,7 @@ class DeepFM(nn.Module):
         - verbose: Bool
         """
         super().__init__()
-        self.field_size = len(feature_sizes)
+        self.field_size = len(feature_sizes) + (1 if seq_vocab_size is not None else 0)
         self.feature_sizes = feature_sizes
         self.embedding_size = embedding_size
         self.hidden_dims = hidden_dims
@@ -72,7 +72,7 @@ class DeepFM(nn.Module):
         if self.seq_vocab_size is not None:
             self.gru_embedding = nn.Embedding(self.seq_vocab_size, self.embedding_size)
             self.gru = nn.GRU(input_size=self.embedding_size, hidden_size=self.embedding_size, batch_first=True)
-            self.gru_linear = nn.Linear(self.embedding_size, 1)
+            self.gru_first_order = nn.Linear(self.embedding_size, 1)
         """
             init deep part
         """
@@ -101,11 +101,33 @@ class DeepFM(nn.Module):
             fm part
         """
 
+        """
+            GRU part (Pre-computation)
+        """
+        gru_out = None
+        if self.seq_vocab_size is not None and seq is not None:
+            # seq: (N, SeqLen)
+            gru_emb = self.gru_embedding(seq) # (N, SeqLen, EmbSize)
+            _, h_n = self.gru(gru_emb) # h_n: (1, N, EmbSize)
+            gru_out = h_n.squeeze(0)   # (N, EmbSize)
+
         Xv = Xv.squeeze(-1)
 
         fm_first_order_emb_arr = [(torch.sum(emb(Xi[:, i, :]), 1).t() * Xv[:, i]).t() for i, emb in enumerate(self.fm_first_order_embeddings)]
+        
+        # Add GRU to 1st order
+        if gru_out is not None:
+            gru_1st = self.gru_first_order(gru_out) # (N, 1)
+            fm_first_order_emb_arr.append(gru_1st)
+
         fm_first_order = torch.cat(fm_first_order_emb_arr, 1)
+        
         fm_second_order_emb_arr = [(torch.sum(emb(Xi[:, i, :]), 1).t() * Xv[:, i]).t() for i, emb in enumerate(self.fm_second_order_embeddings)]
+        
+        # Add GRU to 2nd order (and Deep part)
+        if gru_out is not None:
+            fm_second_order_emb_arr.append(gru_out)
+
         fm_sum_second_order_emb = sum(fm_second_order_emb_arr)
         fm_sum_second_order_emb_square = fm_sum_second_order_emb * \
             fm_sum_second_order_emb  # (x+y)^2
@@ -130,17 +152,6 @@ class DeepFM(nn.Module):
         total_sum = torch.sum(fm_first_order, 1) + \
                     torch.sum(fm_second_order, 1) + torch.sum(deep_out, 1) + self.bias
         
-        """
-            GRU part
-        """
-        if self.seq_vocab_size is not None and seq is not None:
-            # seq: (N, SeqLen)
-            gru_emb = self.gru_embedding(seq) # (N, SeqLen, EmbSize)
-            _, h_n = self.gru(gru_emb) # h_n: (1, N, EmbSize)
-            gru_out = h_n.squeeze(0)   # (N, EmbSize)
-            gru_logit = self.gru_linear(gru_out) # (N, 1)
-            total_sum = total_sum + gru_logit.squeeze(-1)
-
         return total_sum
 
     def fit(self, loader_train, loader_val, optimizer, epochs=100, verbose=False, print_every=100):

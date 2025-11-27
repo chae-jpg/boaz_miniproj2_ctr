@@ -169,7 +169,7 @@ def main():
     os.makedirs(config["save_dir"], exist_ok=True)
 
     set_seed(config["seed"])
-    device = 'mps'
+    device = config["use_cuda"]
     print("Device:", device)
 
     wandb.init(
@@ -191,7 +191,7 @@ def main():
     elif config["data_loader"] == "v2":
         train_loader, val_loader, test_loader = create_v2_dataloaders(train_df, val_df, test_df, v2_sparse_dims)
     elif config["data_loader"] == "v3":
-        train_loader, val_loader, test_loader = create_v3_dataloaders(train_df, val_df, test_df, base_sparse_dims)
+        train_loader, val_loader, test_loader = create_v3_dataloaders(train_df, val_df, test_df, v2_sparse_dims)
     else:
         raise ValueError(f"Unknown data loader: {config['data_loader']}")
 

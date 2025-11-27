@@ -17,7 +17,7 @@ class AutoInt(nn.Module):
                  use_cuda=True, device='cpu', seq_vocab_size=None):
         super(AutoInt, self).__init__()
         self.feature_sizes = feature_sizes # 각 feature의 길이
-        self.field_size = len(feature_sizes) # 한 data에서 feature의 종류 개수
+        self.field_size = len(feature_sizes) + (1 if seq_vocab_size is not None else 0) # 한 data에서 feature의 종류 개수
         self.embedding_size = embedding_size
         self.embedding_dropout = embedding_dropout
         self.att_layer_num = att_layer_num
@@ -84,7 +84,6 @@ class AutoInt(nn.Module):
         if self.seq_vocab_size is not None:
             self.gru_embedding = nn.Embedding(self.seq_vocab_size, self.embedding_size)
             self.gru = nn.GRU(input_size=self.embedding_size, hidden_size=self.embedding_size, batch_first=True)
-            self.gru_linear = nn.Linear(self.embedding_size, 1)
 
         self.to(self.device)
 
@@ -110,6 +109,20 @@ class AutoInt(nn.Module):
             Xv = Xv.unsqueeze(-1)
         embeddings = embeddings * Xv
         
+        """
+            GRU part
+        """
+        if self.seq_vocab_size is not None and seq is not None:
+            # seq: (N, SeqLen)
+            gru_emb = self.gru_embedding(seq) # (N, SeqLen, EmbSize)
+            _, h_n = self.gru(gru_emb) # h_n: (1, N, EmbSize)
+            gru_out = h_n.squeeze(0)   # (N, EmbSize)
+            
+            # Add GRU output as a new feature embedding
+            # gru_out: (N, EmbSize) -> (N, 1, EmbSize)
+            gru_feature = gru_out.unsqueeze(1)
+            embeddings = torch.cat([embeddings, gru_feature], dim=1)
+
         # added : apply dropout as the rate previously set to embeddings_dropout
         embeddings = F.dropout(embeddings, p=self.embedding_dropout)
 
@@ -144,16 +157,10 @@ class AutoInt(nn.Module):
         if self.dnn_hidden_units is not None:
             y_pred = y_pred + dnn_logit
         
-        """
-            GRU part
-        """
-        if self.seq_vocab_size is not None and seq is not None:
-            # seq: (N, SeqLen)
-            gru_emb = self.gru_embedding(seq) # (N, SeqLen, EmbSize)
-            _, h_n = self.gru(gru_emb) # h_n: (1, N, EmbSize)
-            gru_out = h_n.squeeze(0)   # (N, EmbSize)
-            gru_logit = self.gru_linear(gru_out) # (N, 1)
-            y_pred = y_pred + gru_logit
+        # 4. Combine
+        y_pred = att_logit
+        if self.dnn_hidden_units is not None:
+            y_pred = y_pred + dnn_logit
         
         return y_pred
 

@@ -156,8 +156,8 @@ class DatasetV3(Dataset):
         self.seq = df[SEQ_COLS].fillna(0).astype("int64").values # GRU용
         self.label = df[TARGET_COL].astype("float32").values
 
-        self.field_dims = [1] * len(DENSE_COLS) + sparse_dims # Base Sparse Feature만 해당
-        self.seq_vocab_size = sparse_dims[0] # product_id_idx의 vocab size (Sequence Embedding용)
+        self.field_dims = [1] * len(DENSE_COLS) + sparse_dims[:6] # Base Sparse Feature만 해당
+        self.seq_vocab_size = sparse_dims[6] # product_id_idx의 vocab size (Sequence Embedding용)
 
         print(f"[V3 Created] N={len(self.label)}, Sparse Fields={len(self.field_dims)}, Seq Len={self.seq.shape[1]}")
 
