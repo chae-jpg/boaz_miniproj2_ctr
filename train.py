@@ -11,7 +11,8 @@ import numpy as np
 from sklearn.metrics import roc_auc_score
 
 from util.utils import get_device, set_seed, build_model
-
+from data.split import split_exact_tvt_from_preprocessed, extract_dims
+from data.dataset import create_v1_dataloaders, create_v2_dataloaders, create_v3_dataloaders
 
 def train_one_epoch(
     model: nn.Module,
@@ -30,27 +31,31 @@ def train_one_epoch(
 
     pbar = tqdm(loader, desc=f"Train Epoch {epoch}", ncols=100)
 
-    for batch_idx, (xi, xv, y) in enumerate(pbar):
-        xi = xi.to(device=device, dtype=torch.long)
-        xv = xv.to(device=device, dtype=torch.float)
-        y = y.to(device=device, dtype=torch.float)  # (N,) 또는 (N,1)
+    for batch_idx, batch in enumerate(pbar):
+        xi = batch["xi"].to(device=device, dtype=torch.long)
+        xv = batch["xv"].to(device=device, dtype=torch.float)
+        y = batch["label"].to(device=device, dtype=torch.float)  # (N,) 또는 (N,1)
+        
+        seq = None
+        if "seq" in batch:
+             seq = batch["seq"].to(device=device, dtype=torch.long)
 
-        logits = model(xi, xv)          # DeepFM: (N,), AutoInt: (N,1)
+        logits = model(xi, xv, seq=seq)          # DeepFM: (N,), AutoInt: (N,1)
         logits = logits.view(-1)        # (N,)
-        loss = criterion(logits, y.view(-1))
+        preds = torch.sigmoid(logits)   # Apply sigmoid to get [0,1] range
+        loss = criterion(preds, y.view(-1))
 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
         with torch.no_grad():
-            probs = torch.sigmoid(logits)
-            preds = (probs > 0.5).float()
-            correct = (preds == y.view(-1)).sum().item()
+            # For regression: calculate MAE instead of accuracy
+            mae = torch.abs(preds - y.view(-1)).mean().item()
             total = y.numel()
 
         running_loss += loss.item() * total
-        running_corrects += correct
+        running_corrects += mae * total  # Store MAE instead of correct count
         running_total += total
 
         global_step += 1
@@ -58,7 +63,7 @@ def train_one_epoch(
         # tqdm status
         pbar.set_postfix({
             "loss": f"{loss.item():.4f}",
-            "acc": f"{correct / total:.4f}"
+            "mae": f"{mae:.4f}"
         })
 
         # wandb step logging
@@ -66,25 +71,25 @@ def train_one_epoch(
             wandb.log(
                 {
                     "train/loss": loss.item(),
-                    "train/accuracy": correct / total,
+                    "train/mae": mae,
                     "train/epoch": epoch,
                     "train/global_step": global_step,
                 }
             )
 
     epoch_loss = running_loss / max(running_total, 1)
-    epoch_acc = running_corrects / max(running_total, 1)
+    epoch_mae = running_corrects / max(running_total, 1)  # Actually MAE
 
     wandb.log(
         {
             "train/epoch_loss": epoch_loss,
-            "train/epoch_accuracy": epoch_acc,
+            "train/epoch_mae": epoch_mae,
             "train/epoch": epoch,
             "train/global_step": global_step,
         }
     )
 
-    print(f"[Train] Epoch: {epoch} - Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.4f}")
+    print(f"[Train] Epoch: {epoch} - Loss: {epoch_loss:.4f}, MAE: {epoch_mae:.4f}")
     return global_step
 
 
@@ -106,48 +111,54 @@ def evaluate(
     all_probs = []
     all_labels = []
 
-    for xi, xv, y in loader:
-        xi = xi.to(device=device, dtype=torch.long)
-        xv = xv.to(device=device, dtype=torch.float)
-        y = y.to(device=device, dtype=torch.float)
+    for batch in loader:
+        xi = batch["xi"].to(device=device, dtype=torch.long)
+        xv = batch["xv"].to(device=device, dtype=torch.float)
+        y = batch["label"].to(device=device, dtype=torch.float)
 
-        logits = model(xi, xv)
+        seq = None
+        if "seq" in batch:
+             seq = batch["seq"].to(device=device, dtype=torch.long)
+
+        logits = model(xi, xv, seq=seq)
         logits = logits.view(-1)
-        loss = criterion(logits, y.view(-1))
+        preds = torch.sigmoid(logits)   # Apply sigmoid to get [0,1] range
+        loss = criterion(preds, y.view(-1))
 
-        probs = torch.sigmoid(logits)
-        preds = (probs > 0.5).float()
-        correct = (preds == y.view(-1)).sum().item()
+        # For regression: calculate MAE
+        mae = torch.abs(preds - y.view(-1)).mean().item()
         total = y.numel()
 
         running_loss += loss.item() * total
-        running_correct += correct
+        running_correct += mae * total  # Store MAE
         running_total += total
 
-        all_probs.append(probs.detach().cpu().numpy())
+        all_probs.append(preds.detach().cpu().numpy())
         all_labels.append(y.view(-1).detach().cpu().numpy())
 
-    ## AUC 계산
-    all_probs = np.concatenate(all_probs)
+    ## Calculate metrics
+    all_preds = np.concatenate(all_probs)
     all_labels = np.concatenate(all_labels)
 
     epoch_loss = running_loss / max(running_total, 1)
-    epoch_acc = running_correct / max(running_total, 1)
+    epoch_mae = running_correct / max(running_total, 1)
 
-    epoch_auc = roc_auc_score(all_labels, all_probs)
+    # For regression with continuous labels, we can still track correlation
+    from scipy.stats import pearsonr
+    correlation, _ = pearsonr(all_preds, all_labels) if len(all_preds) > 1 else (0, 1)
 
     wandb.log(
         {
             f"{split}/loss": epoch_loss,
-            f"{split}/acc": epoch_acc,
-            f"{split}/auc": epoch_auc,
+            f"{split}/mae": epoch_mae,
+            f"{split}/correlation": correlation,
             f"{split}/epoch": epoch,
             "global_step": global_step,
         }
     )
 
-    print(f"[{split.capitalize()}] Epoch: {epoch} - Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.4f}")
-    return {"loss": epoch_loss, "accuracy": epoch_acc}
+    print(f"[{split.capitalize()}] Epoch: {epoch} - Loss: {epoch_loss:.4f}, MAE: {epoch_mae:.4f}, Corr: {correlation:.4f}")
+    return {"loss": epoch_loss, "mae": epoch_mae}
 
 
 def main():
@@ -158,7 +169,7 @@ def main():
     os.makedirs(config["save_dir"], exist_ok=True)
 
     set_seed(config["seed"])
-    device = get_device(config["use_cuda"])
+    device = 'mps'
     print("Device:", device)
 
     wandb.init(
@@ -168,40 +179,37 @@ def main():
         config=config,
     )
 
-    # TODO: 실제 데이터셋으로 교체
-    # train_data = CriteoDataset(config["data_dir"], train=True)
-    # val_data = CriteoDataset(config["data_dir"], train=False)
-    train_data = ...
-    val_data = ...
-
-    train_loader = DataLoader(
-        train_data,
-        batch_size=config["batch_size"],
-        shuffle=True,
-        num_workers=config["num_workers"],
-        pin_memory=True,
+    # Suppose using preprocessed data
+    train_df, val_df, test_df = split_exact_tvt_from_preprocessed(
+        parquet_path=config["data_dir"] + '/' + config["data_name"],
     )
 
-    val_loader = DataLoader(
-        val_data,
-        batch_size=config["batch_size"],
-        shuffle=False,
-        num_workers=config["num_workers"],
-        pin_memory=True,
-    )
+    base_sparse_dims, v2_sparse_dims = extract_dims(train_df)
 
-    # feature_sizes 추출
-    if hasattr(train_data, "feature_sizes"):
-        feature_sizes = train_data.feature_sizes
-    elif hasattr(train_data, "field_sizes"):
-        feature_sizes = train_data.field_sizes
+    if config["data_loader"] == "v1":
+        train_loader, val_loader, test_loader = create_v1_dataloaders(train_df, val_df, test_df, base_sparse_dims)
+    elif config["data_loader"] == "v2":
+        train_loader, val_loader, test_loader = create_v2_dataloaders(train_df, val_df, test_df, v2_sparse_dims)
+    elif config["data_loader"] == "v3":
+        train_loader, val_loader, test_loader = create_v3_dataloaders(train_df, val_df, test_df, base_sparse_dims)
     else:
-        raise ValueError("Dataset must have 'feature_sizes' or 'field_sizes' attribute.")
+        raise ValueError(f"Unknown data loader: {config['data_loader']}")
+
+    # feature_sizes 추출 (DataLoader의 dataset에서 가져오기)
+    seq_vocab_size = None
+    if hasattr(train_loader.dataset, "field_dims"):
+        feature_sizes = train_loader.dataset.field_dims
+        print(f"Feature sizes: {feature_sizes}")
+        if hasattr(train_loader.dataset, "seq_vocab_size"):
+             seq_vocab_size = train_loader.dataset.seq_vocab_size
+             print(f"Sequence Vocab Size: {seq_vocab_size}")
+    else:
+        raise ValueError("Dataset must have 'field_dims' attribute.")
 
     # DeepFM / AutoInt 선택은 build_model 안에서 config["model_type"] 보고 처리한다고 가정
-    model = build_model(config, feature_sizes, device)
+    model = build_model(config, feature_sizes, device, seq_vocab_size=seq_vocab_size)
 
-    criterion = nn.BCEWithLogitsLoss()
+    criterion = nn.MSELoss()  # Using MSE for regression (labels: 0, 0.5, 1)
     optimizer = torch.optim.Adam(
         model.parameters(),
         lr=config["lr"],
@@ -218,6 +226,11 @@ def main():
 
     best_val_loss = float("inf")
     global_step = 0
+    
+    # Early stopping setup
+    patience = config.get("early_stopping_patience", 10)
+    patience_counter = 0
+    print(f"Early stopping enabled with patience={patience}")
 
     for epoch in range(1, config["epochs"] + 1):
         print(f"\n===== Epoch [{epoch}/{config['epochs']}] =====")
@@ -245,8 +258,11 @@ def main():
 
         scheduler.step()
 
+        print(f'DEBUG: val_loss={val_metrics["loss"]:.6f}, best_val_loss={best_val_loss:.6f}')
+
         if val_metrics["loss"] < best_val_loss:
             best_val_loss = val_metrics["loss"]
+            patience_counter = 0  # Reset counter when improvement occurs
             ckpt_path = os.path.join(
                 config["save_dir"], f"best_{config['model_type']}.pth"
             )
@@ -263,8 +279,52 @@ def main():
                 ckpt_path,
             )
             print(f"★ New best model saved to {ckpt_path} (val_loss={best_val_loss:.4f})")
+        else:
+            patience_counter += 1
+            print(f"No improvement for {patience_counter}/{patience} epochs")
+            
+            if patience_counter >= patience:
+                print(f"\n⚠️ Early stopping triggered! No improvement for {patience} epochs.")
+                print(f"Best validation loss: {best_val_loss:.4f}")
+                break
 
+
+    print("\n" + "="*50)
     print("Training finished.")
+    print("="*50)
+    
+    # Load best model and evaluate on test set
+    best_ckpt_path = os.path.join(config["save_dir"], f"best_{config['model_type']}.pth")
+    
+    if os.path.exists(best_ckpt_path):
+        print(f"\nLoading best model from {best_ckpt_path}")
+        checkpoint = torch.load(best_ckpt_path, map_location=device)
+        model.load_state_dict(checkpoint["model_state"])
+        print(f"Best model from epoch {checkpoint['epoch']} loaded (val_loss={checkpoint['best_val_loss']:.4f})")
+        
+        print("\n" + "="*50)
+        print("Evaluating on Test Set")
+        print("="*50)
+        
+        test_metrics = evaluate(
+            model=model,
+            loader=test_loader,
+            criterion=criterion,
+            device=device,
+            epoch=checkpoint['epoch'],
+            global_step=checkpoint['global_step'],
+            split="test",
+        )
+        
+        print(f"\n{'='*50}")
+        print(f"Final Test Results:")
+        print(f"  - Test Loss: {test_metrics['loss']:.4f}")
+        print(f"  - Test MAE: {test_metrics['mae']:.4f}")
+        print(f"{'='*50}\n")
+    else:
+        print(f"\nWarning: Best model checkpoint not found at {best_ckpt_path}")
+        print("Skipping test evaluation.")
+    
     wandb.finish()
 
 

@@ -14,7 +14,7 @@ class AutoInt(nn.Module):
                  dnn_hidden_units=[32, 32], dnn_activation='relu',
                  l2_reg_dnn=0, l2_reg_embedding=1e-5, dnn_use_bn=False, 
                  dnn_dropout=0, init_std=0.0001, seed=1024, 
-                 use_cuda=True, device='cpu'):
+                 use_cuda=True, device='cpu', seq_vocab_size=None):
         super(AutoInt, self).__init__()
         self.feature_sizes = feature_sizes # 각 feature의 길이
         self.field_size = len(feature_sizes) # 한 data에서 feature의 종류 개수
@@ -77,9 +77,18 @@ class AutoInt(nn.Module):
         self.att_output_dim = self.field_size * self.embedding_size 
         self.final_linear = nn.Linear(self.att_output_dim, 1)
 
+        """
+            init GRU part (if seq_vocab_size provided)
+        """
+        self.seq_vocab_size = seq_vocab_size
+        if self.seq_vocab_size is not None:
+            self.gru_embedding = nn.Embedding(self.seq_vocab_size, self.embedding_size)
+            self.gru = nn.GRU(input_size=self.embedding_size, hidden_size=self.embedding_size, batch_first=True)
+            self.gru_linear = nn.Linear(self.embedding_size, 1)
+
         self.to(self.device)
 
-    def forward(self, Xi, Xv):
+    def forward(self, Xi, Xv, seq=None):
         """
         Xi: (batch_size, field_size, 1) - Indices
         Xv: (batch_size, field_size, 1) - Values
@@ -134,6 +143,17 @@ class AutoInt(nn.Module):
         y_pred = att_logit
         if self.dnn_hidden_units is not None:
             y_pred = y_pred + dnn_logit
+        
+        """
+            GRU part
+        """
+        if self.seq_vocab_size is not None and seq is not None:
+            # seq: (N, SeqLen)
+            gru_emb = self.gru_embedding(seq) # (N, SeqLen, EmbSize)
+            _, h_n = self.gru(gru_emb) # h_n: (1, N, EmbSize)
+            gru_out = h_n.squeeze(0)   # (N, EmbSize)
+            gru_logit = self.gru_linear(gru_out) # (N, 1)
+            y_pred = y_pred + gru_logit
         
         return y_pred
 

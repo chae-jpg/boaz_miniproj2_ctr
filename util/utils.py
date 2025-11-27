@@ -14,7 +14,7 @@ def set_seed(seed):
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
 
-def build_model(config, feature_sizes, device):
+def build_model(config, feature_sizes, device, seq_vocab_size=None):
     model_type = config.get("model_type", "deepfm")
      
     if model_type.lower() == "deepfm":
@@ -26,6 +26,7 @@ def build_model(config, feature_sizes, device):
             dropout=config["deepfm_dropout"],
             use_cuda = config.get("use_cuda", True),
             verbose = False,
+            seq_vocab_size=seq_vocab_size
         )
     elif model_type.lower() == "autoint":
         model = AutoInt(
@@ -36,7 +37,7 @@ def build_model(config, feature_sizes, device):
             att_head_num=config["att_head_num"],
             att_res=config["att_res"],
             att_dropout=config["att_dropout"],
-            dnn_hidden_units=config["dnn_hidden_units"],
+            dnn_hidden_units=config["autoint_dnn_hidden_units"],
             dnn_activation='relu',
             l2_reg_dnn=config["l2_reg_dnn"],
             l2_reg_embedding=config["l2_reg_embedding"],
@@ -46,6 +47,7 @@ def build_model(config, feature_sizes, device):
             seed=config["seed"],
             use_cuda=config["use_cuda"],
             device=device,
+            seq_vocab_size=seq_vocab_size
         )
 
     else:
