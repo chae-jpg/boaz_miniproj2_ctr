@@ -1,7 +1,7 @@
 {
   "project": "ctr-models",
   "entity": "BOAZminiprj2",
-  "run_name": "autoint_v3",
+  "run_name": "autoint_class",
   "model_type": "autoint",
   "data_dir": "./data",
   "data_name": "final_preprocessed_df.parquet",
@@ -37,5 +37,6 @@
   "l2_reg_dnn": 0.0,
   "l2_reg_embedding": 1e-5,
   "init_std": 0.0001,
-  "early_stopping_patience": 10
+  "early_stopping_patience": 10,
+  "num_classes": 3
 }

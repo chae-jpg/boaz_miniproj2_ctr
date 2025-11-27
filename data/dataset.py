@@ -50,7 +50,12 @@ class DatasetV1(Dataset):
         super().__init__()
         self.dense = df[DENSE_COLS].astype("float32").values # Continuous values
         self.sparse = df[SPARSE_BASE_COLS].astype("int64").values # Categorical values
-        self.label = df[TARGET_COL].astype("float32").values
+        
+        # Map 0 -> 0, 0.5 -> 1, 1 -> 2
+        # Use replace to handle Series properly
+        df[TARGET_COL] = df[TARGET_COL].replace({0.5: 1, 1: 2}).astype("int64")
+
+        self.label = df[TARGET_COL].values
 
         # 메타데이터 저장
         self.field_dims = [1] * len(DENSE_COLS) + sparse_dims  # Sparse 각 컬럼의 vocab size
@@ -104,7 +109,11 @@ class DatasetV2(Dataset):
         # Sparse + Seq(5개) 합치기
         all_sparse_cols = SPARSE_BASE_COLS + SEQ_COLS
         self.sparse = df[all_sparse_cols].fillna(0).astype("int64").values
-        self.label = df[TARGET_COL].astype("float32").values
+
+        # Map 0 -> 0, 0.5 -> 1, 1 -> 2
+        df[TARGET_COL] = df[TARGET_COL].replace({0.5: 1, 1: 2}).astype("int64")
+
+        self.label = df[TARGET_COL].values
 
         self.field_dims = [1] * len(DENSE_COLS) + all_sparse_dims # Base(6개) + Seq(5개) = 총 11개 필드 크기 정보
 
@@ -154,7 +163,11 @@ class DatasetV3(Dataset):
         self.dense = df[DENSE_COLS].astype("float32").values
         self.sparse = df[SPARSE_BASE_COLS].astype("int64").values
         self.seq = df[SEQ_COLS].fillna(0).astype("int64").values # GRU용
-        self.label = df[TARGET_COL].astype("float32").values
+
+        # Map 0 -> 0, 0.5 -> 1, 1 -> 2
+        df[TARGET_COL] = df[TARGET_COL].replace({0.5: 1, 1: 2}).astype("int64")
+
+        self.label = df[TARGET_COL].values
 
         self.field_dims = [1] * len(DENSE_COLS) + sparse_dims # Base Sparse Feature만 해당
         self.seq_vocab_size = sparse_dims[0] # product_id_idx의 vocab size (Sequence Embedding용)

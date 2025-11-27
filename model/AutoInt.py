@@ -14,7 +14,7 @@ class AutoInt(nn.Module):
                  dnn_hidden_units=[32, 32], dnn_activation='relu',
                  l2_reg_dnn=0, l2_reg_embedding=1e-5, dnn_use_bn=False, 
                  dnn_dropout=0, init_std=0.0001, seed=1024, 
-                 use_cuda=True, device='cpu', seq_vocab_size=None):
+                 use_cuda=True, device='cpu', seq_vocab_size=None, num_classes=1):
         super(AutoInt, self).__init__()
         self.feature_sizes = feature_sizes # 각 feature의 길이
         self.field_size = len(feature_sizes) + (1 if seq_vocab_size is not None else 0) # 한 data에서 feature의 종류 개수
@@ -33,6 +33,7 @@ class AutoInt(nn.Module):
         self.init_std = init_std
         self.seed = seed
         self.device = device
+        self.num_classes = num_classes
         
         # Embeddings : 모든 feature_size에 대해 feature_size -> embedding_size 차원으로 변환
         self.embeddings = nn.ModuleList(
@@ -61,7 +62,7 @@ class AutoInt(nn.Module):
                     self.dnn_layers.append(nn.Dropout(self.dnn_dropout))
                 input_dim = hidden_unit # hidden unit 차원으로 input dim 변경
                 
-            self.dnn_output_layer = nn.Linear(input_dim, 1)
+            self.dnn_output_layer = nn.Linear(input_dim, self.num_classes)
         
         if self.att_res is True:
             self.res_layer =  nn.Sequential(
@@ -75,7 +76,7 @@ class AutoInt(nn.Module):
         # Final Output Layer (combining Attention output and DNN output)
         # Attention output dimension: field_size * embedding_size
         self.att_output_dim = self.field_size * self.embedding_size 
-        self.final_linear = nn.Linear(self.att_output_dim, 1)
+        self.final_linear = nn.Linear(self.att_output_dim, self.num_classes)
 
         """
             init GRU part (if seq_vocab_size provided)

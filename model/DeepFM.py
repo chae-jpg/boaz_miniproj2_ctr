@@ -86,6 +86,18 @@ class DeepFM(nn.Module):
                     nn.BatchNorm1d(all_dims[i]))
             setattr(self, 'dropout_'+str(i),
                     nn.Dropout(dropout[i-1]))
+        
+        # Final Deep Layer
+        self.deep_final = nn.Linear(hidden_dims[-1], num_classes)
+        
+        """
+            init multi-class projection (if num_classes > 1)
+        """
+        if self.num_classes > 1:
+            # Project 2nd order interaction vector (embedding_size) -> num_classes
+            self.fm_2nd_project = nn.Linear(self.embedding_size, self.num_classes)
+            # Project 1st order sum (1) -> num_classes
+            self.fm_1st_project = nn.Linear(1, self.num_classes)
 
         
 
@@ -146,11 +158,31 @@ class DeepFM(nn.Module):
             deep_out = getattr(self, 'linear_' + str(i))(deep_out)
             deep_out = getattr(self, 'batchNorm_' + str(i))(deep_out)
             deep_out = getattr(self, 'dropout_' + str(i))(deep_out)
+            
+        deep_out = self.deep_final(deep_out) # (N, num_classes)
         """
             sum
         """
-        total_sum = torch.sum(fm_first_order, 1) + \
-                    torch.sum(fm_second_order, 1) + torch.sum(deep_out, 1) + self.bias
+        if self.num_classes == 1:
+            # Binary/Regression: Standard DeepFM
+            # fm_first_order: (N, field_size, 1) -> sum -> (N, 1) -> squeeze -> (N,)
+            # fm_second_order: (N, embedding_size) -> sum -> (N, 1) -> squeeze -> (N,)
+            # deep_out: (N, 1) -> squeeze -> (N,)
+            
+            total_sum = torch.sum(fm_first_order, 1) + \
+                        torch.sum(fm_second_order, 1) + \
+                        torch.sum(deep_out, 1) + self.bias
+        else:
+            # Multi-class: Project FM parts
+            # fm_second_order is (N, embedding_size)
+            fm_2nd_part = self.fm_2nd_project(fm_second_order) # (N, num_classes)
+            
+            # fm_first_order is (N, field_size, 1) -> sum -> (N, 1)
+            fm_1st_sum = torch.sum(fm_first_order, 1, keepdim=True) # (N, 1)
+            fm_1st_part = self.fm_1st_project(fm_1st_sum) # (N, num_classes)
+            
+            # deep_out is (N, num_classes)
+            total_sum = deep_out + fm_2nd_part + fm_1st_part + self.bias
         
         return total_sum
 

@@ -22,7 +22,7 @@ def build_model(config, feature_sizes, device, seq_vocab_size=None):
             feature_sizes=feature_sizes,
             embedding_size=config["embedding_size"],
             hidden_dims=config["deepfm_hidden_dims"],
-            num_classes=1,
+            num_classes=config.get("num_classes", 1),
             dropout=config["deepfm_dropout"],
             use_cuda = config.get("use_cuda", True),
             verbose = False,
@@ -47,7 +47,8 @@ def build_model(config, feature_sizes, device, seq_vocab_size=None):
             seed=config["seed"],
             use_cuda=config["use_cuda"],
             device=device,
-            seq_vocab_size=seq_vocab_size
+            seq_vocab_size=seq_vocab_size,
+            num_classes=config.get("num_classes", 1)
         )
 
     else:
