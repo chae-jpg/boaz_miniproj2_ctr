@@ -184,7 +184,7 @@ def main():
         parquet_path=config["data_dir"] + '/' + config["data_name"],
     )
 
-    base_sparse_dims, v2_sparse_dims = extract_dims(train_df)
+    base_sparse_dims, v2_sparse_dims = extract_dims(train_df, val_df, test_df)
 
     if config["data_loader"] == "v1":
         train_loader, val_loader, test_loader = create_v1_dataloaders(train_df, val_df, test_df, base_sparse_dims)
